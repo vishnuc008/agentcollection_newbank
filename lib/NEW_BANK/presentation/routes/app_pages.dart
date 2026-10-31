@@ -4,4 +4,7 @@ class AppPages {
   static const dashboard = '/dashboard';
   static const collection = '/collection';
   static const report = '/report';
+  static const savecollection = '/savecollection';
+  static const adminpage = '/adminpage';
+  static const changepasswordpage = '/changepasswordpage';
 }

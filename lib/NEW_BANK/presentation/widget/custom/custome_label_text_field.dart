@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:ionicons/ionicons.dart';
 
 import '../../themes/app_colors.dart';
 
@@ -143,7 +142,7 @@ class _LabelCustomTextField extends State<LabelCustomTextField> {
                           icon:
                               showpassword
                                   ? Icon(
-                                    Ionicons.eye_off,
+                                    Icons.visibility_off,
                                     size: 20,
                                     color: Theme.of(context).primaryColor,
                                   )

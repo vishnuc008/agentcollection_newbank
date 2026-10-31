@@ -2,16 +2,26 @@ import 'dart:io';
 
 import 'package:agentcollection_newbank/NEW_BANK/core/pretty_printer.dart';
 import 'package:agentcollection_newbank/NEW_BANK/data/remote/remote_routes/app_remote_routes.dart';
+import 'package:agentcollection_newbank/NEW_BANK/presentation/routes/LocalStorageNames.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 import 'custom_exception.dart';
 
 class ApiProvider {
+  static final ApiProvider _instance = ApiProvider._internal();
+  factory ApiProvider() => _instance;
   late Dio _dio;
 
-  ApiProvider() {
+  ApiProvider._internal() {
+    final storage = GetStorage();
+    String? savedUrl = storage.read("BASE_URL");
+    String initialUrl = savedUrl ?? AppRemoteRoutes.baseUrl;
+    AppRemoteRoutes.baseUrl = initialUrl;
+
     _dio = Dio(
       BaseOptions(
         validateStatus: (status) {
@@ -22,51 +32,60 @@ class ApiProvider {
           "access-control-allow-origin": "*",
           // "Access-Control-Allow-Origin": "*",
           // "Access-Control-Allow-Credentials": false,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        baseUrl: AppRemoteRoutes.baseUrl,
+        baseUrl: initialUrl,
         connectTimeout: const Duration(minutes: 5),
         receiveTimeout: const Duration(minutes: 5),
       ),
     );
     if (!kIsWeb) {
-      (_dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
-          (HttpClient client) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate = (
+        HttpClient client,
+      ) {
         client.badCertificateCallback =
             (X509Certificate cert, String host, int port) => true;
         return client;
       };
     }
   }
+  void updatebaseUrl(String newUrl) {
+    AppRemoteRoutes.baseUrl = newUrl;
+    _dio.options.baseUrl = newUrl; //update dio instance
+    final storage = GetStorage();
+    storage.write("BASE_URL", newUrl);
+    prettyPrint("base url updated to : $newUrl");
+  }
+
   addToken() {
-    // final getstorage = GetStorage();
-    // String? accesstoken = getstorage.read(LocalStorageKeys.accessTokenKEY);
-    // String? refreshtoken = getstorage.read(LocalStorageKeys.accessTokenKEY);
-    // if (accesstoken != null) {
-    //   Map<String, dynamic> decodedToken = JwtDecoder.decode(accesstoken);
-    //   prettyPrint(decodedToken["name"]);
-    //   bool isTokenExpired = JwtDecoder.isExpired(accesstoken);
-    //   Duration tokenTime = JwtDecoder.getTokenTime(accesstoken);
-    //   prettyPrint("token time =${tokenTime.inMinutes}");
-    //   if (!isTokenExpired) {
-    //     _dio.options.headers.addAll({'authorization': 'Bearer $accesstoken'});
-    //   } else {
-    //     _dio.options.headers.addAll({'Cookie': 'refreshToken=$refreshtoken'});
-    //   }
-    //   _dio.options.headers.addAll(
-    //       {'accessToken': accesstoken, 'refreshToken': "$refreshtoken"});
-    // } else {
-    //   prettyPrint("Access token is null");
-    // }
+    final getstorage = GetStorage();
+    String? accesstoken = getstorage.read(LocalStorageKeys.accessTokenKEY);
+    String? refreshtoken = getstorage.read(LocalStorageKeys.accessTokenKEY);
+    if (accesstoken != null) {
+      Map<String, dynamic> decodedToken = JwtDecoder.decode(accesstoken);
+      prettyPrint(decodedToken["name"]);
+      bool isTokenExpired = JwtDecoder.isExpired(accesstoken);
+      Duration tokenTime = JwtDecoder.getTokenTime(accesstoken);
+      prettyPrint("token time =${tokenTime.inMinutes}");
+      if (!isTokenExpired) {
+        _dio.options.headers.addAll({'authorization': 'Bearer $accesstoken'});
+      } else {
+        _dio.options.headers.addAll({'Cookie': 'refreshToken=$refreshtoken'});
+      }
+      _dio.options.headers.addAll({
+        'accessToken': accesstoken,
+        'refreshToken': "$refreshtoken",
+      });
+    } else {
+      prettyPrint("Access token is null");
+    }
   }
 
   Future<dynamic> get(String endPoint) async {
     try {
       addToken();
       prettyPrint(_dio.options.headers.toString());
-      final Response response = await _dio.get(
-        endPoint,
-      );
+      final Response response = await _dio.get(endPoint);
       prettyPrint("request url : ${response.realUri}");
       final responseData = classifyResponse(response);
 
@@ -81,9 +100,7 @@ class ApiProvider {
     try {
       addToken();
       prettyPrint(_dio.options.headers.toString());
-      final Response response = await _dio.delete(
-        endPoint,
-      );
+      final Response response = await _dio.delete(endPoint);
       prettyPrint("getting response${response.realUri}");
       final responseData = classifyResponse(response);
       return responseData;
@@ -93,20 +110,14 @@ class ApiProvider {
     }
   }
 
-  Future<dynamic> post(
-    String endPoint,
-    dynamic body,
-  ) async {
+  Future<dynamic> post(String endPoint, dynamic body) async {
     prettyPrint("on post call$body");
     try {
       prettyPrint("starting dio");
 
       addToken();
       // prettyPrint(_dio.options.)
-      final Response response = await _dio.post(
-        endPoint,
-        data: body,
-      );
+      final Response response = await _dio.post(endPoint, data: body);
 
       prettyPrint("getting response${response.realUri}");
       final responseData = classifyResponse(response);
@@ -122,10 +133,7 @@ class ApiProvider {
     prettyPrint("On postFormData call");
     try {
       addToken();
-      final Response response = await _dio.post(
-        endPoints,
-        data: formData,
-      );
+      final Response response = await _dio.post(endPoints, data: formData);
       prettyPrint("getting response for FormData ${response.realUri}");
       final responseData = classifyResponse(response);
       prettyPrint(responseData.toString());
@@ -140,10 +148,7 @@ class ApiProvider {
     prettyPrint("on post call");
     try {
       addToken();
-      final Response response = await _dio.put(
-        endPoint,
-        data: body,
-      );
+      final Response response = await _dio.put(endPoint, data: body);
 
       final responseData = classifyResponse(response);
 
